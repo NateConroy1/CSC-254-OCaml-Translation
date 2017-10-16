@@ -549,8 +549,16 @@ and ast_e =
 | AST_num of string;;
 
 let rec ast_ize_P (p:parse_tree) : ast_sl =
-  (* your code should replace the following line *)
-  []
+  (*
+  	PT_nt ("P", [SL, $$])
+
+  	h = SL  (pass this to ast_ize_SL)
+  	t = $$  (do nothing with this, we don't need to handle EOF)
+  *)
+  match p with
+  | PT_nt ("P", h::t) -> ast_ize_SL (h)
+  (* this is just debug, if anything goes to this, we fucked up or the program has bad syntax *)
+  | _ -> [AST_read ("we fucked up")]
 
 and ast_ize_SL (sl:parse_tree) : ast_sl =
   match sl with
@@ -595,6 +603,8 @@ and ast_ize_expr_tail (lhs:ast_e) (tail:parse_tree) : ast_e =
   *)
   | _ -> raise (Failure "malformed parse tree in ast_ize_expr_tail")
 ;;
+
+let l = parse ecg_parse_table "x := 1";;
 
 (*******************************************************************
     Translate to C
