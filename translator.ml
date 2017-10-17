@@ -549,40 +549,35 @@ and ast_e =
 | AST_num of string;;
 
 let rec ast_ize_P (p:parse_tree) : ast_sl =
-  (*
-  	PT_nt ("P", [SL, $$])
-
-  	h = SL  (pass this to ast_ize_SL)
-  	t = $$  (do nothing with this, we don't need to handle EOF)
-  *)
   match p with
-  | PT_nt ("P", h::t) -> ast_ize_SL (h)
-  (* this is just debug, if anything goes to this, we fucked up or the program has bad syntax *)
-  | _ -> [AST_read ("we fucked up")]
+  | PT_nt ("P", [statement_list; end_of_file]) -> ast_ize_SL (statement_list)
+  | _ -> raise (Failure "malformed parse tree in ast_ize_P")
 
 and ast_ize_SL (sl:parse_tree) : ast_sl =
   match sl with
   | PT_nt ("SL", []) -> []
-  (*
-     your code here ...
-  *)
+  | PT_nt ("SL", [statement; statement_list]) -> ast_ize_S (statement) :: ast_ize_SL (statement_list)
   | _ -> raise (Failure "malformed parse tree in ast_ize_SL")
 
 and ast_ize_S (s:parse_tree) : ast_s =
   match s with
-  | PT_nt ("S", [PT_id lhs; PT_term ":="; expr])
-        -> AST_assign (lhs, (ast_ize_expr expr))
-  (*
-     your code here ...
-  *)
+  | PT_nt ("S", [PT_id lhs; PT_term ":="; expr]) -> AST_assign (lhs, (ast_ize_expr expr))
+  | PT_nt ("S", [PT_term read; PT_id id]) -> AST_read (id)
+  | PT_nt ("S", [PT_term write; expr]) -> AST_write (ast_ize_expr expr)
+  | PT_nt ("S", [PT_term if_term; relation; statement_list; PT_term fi_term]) -> AST_if ((ast_ize_expr relation), (ast_ize_SL statement_list))
+  | PT_nt ("S", [PT_term do_term; statement_list; PT_term od_term]) -> AST_do (ast_ize_SL statement_list)
+  | PT_nt ("S", [PT_term check; relation]) -> AST_check (ast_ize_expr relation)
   | _ -> raise (Failure "malformed parse tree in ast_ize_S")
 
 and ast_ize_expr (e:parse_tree) : ast_e =
   (* e is an R, E, T, or F parse tree node *)
   match e with
-  (*
-     your code here ...
-  *)
+  | PT_nt ("R", [expr; expr_tail]) -> ast_ize_reln_tail (ast_ize_expr expr) (expr_tail)
+  | PT_nt ("E", [term; term_tail]) -> ast_ize_expr_tail (ast_ize_expr term) (term_tail)
+  | PT_nt ("T", [factor; factor_tail]) -> ast_ize_expr_tail (ast_ize_expr factor) (factor_tail)
+  | PT_nt ("F", [PT_id id]) -> AST_id (id)
+  | PT_nt ("F", [PT_num num]) -> AST_num (num)
+  | PT_nt ("F", [PT_term lparen; expr; PT_term rparen]) -> ast_ize_expr expr
   | _ -> raise (Failure "malformed parse tree in ast_ize_expr")
 
 and ast_ize_reln_tail (lhs:ast_e) (tail:parse_tree) : ast_e =
@@ -604,7 +599,8 @@ and ast_ize_expr_tail (lhs:ast_e) (tail:parse_tree) : ast_e =
   | _ -> raise (Failure "malformed parse tree in ast_ize_expr_tail")
 ;;
 
-let l = parse ecg_parse_table "x := 1";;
+let l = parse ecg_parse_table "x := (1 * 4)";;
+let m = parse ecg_parse_table "read a";;
 
 (*******************************************************************
     Translate to C
