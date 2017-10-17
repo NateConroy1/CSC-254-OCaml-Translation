@@ -562,11 +562,11 @@ and ast_ize_SL (sl:parse_tree) : ast_sl =
 and ast_ize_S (s:parse_tree) : ast_s =
   match s with
   | PT_nt ("S", [PT_id lhs; PT_term ":="; expr]) -> AST_assign (lhs, (ast_ize_expr expr))
-  | PT_nt ("S", [PT_term read; PT_id id]) -> AST_read (id)
-  | PT_nt ("S", [PT_term write; expr]) -> AST_write (ast_ize_expr expr)
-  | PT_nt ("S", [PT_term if_term; relation; statement_list; PT_term fi_term]) -> AST_if ((ast_ize_expr relation), (ast_ize_SL statement_list))
-  | PT_nt ("S", [PT_term do_term; statement_list; PT_term od_term]) -> AST_do (ast_ize_SL statement_list)
-  | PT_nt ("S", [PT_term check; relation]) -> AST_check (ast_ize_expr relation)
+  | PT_nt ("S", [PT_term "read"; PT_id id]) -> AST_read (id)
+  | PT_nt ("S", [PT_term "write"; expr]) -> AST_write (ast_ize_expr expr)
+  | PT_nt ("S", [PT_term "if"; relation; statement_list; PT_term "fi"]) -> AST_if ((ast_ize_expr relation), (ast_ize_SL statement_list))
+  | PT_nt ("S", [PT_term "do"; statement_list; PT_term "od"]) -> AST_do (ast_ize_SL statement_list)
+  | PT_nt ("S", [PT_term "check"; relation]) -> AST_check (ast_ize_expr relation)
   | _ -> raise (Failure "malformed parse tree in ast_ize_S")
 
 and ast_ize_expr (e:parse_tree) : ast_e =
@@ -577,16 +577,20 @@ and ast_ize_expr (e:parse_tree) : ast_e =
   | PT_nt ("T", [factor; factor_tail]) -> ast_ize_expr_tail (ast_ize_expr factor) (factor_tail)
   | PT_nt ("F", [PT_id id]) -> AST_id (id)
   | PT_nt ("F", [PT_num num]) -> AST_num (num)
-  | PT_nt ("F", [PT_term lparen; expr; PT_term rparen]) -> ast_ize_expr expr
+  | PT_nt ("F", [PT_term "("; expr; PT_term ")"]) -> ast_ize_expr expr
   | _ -> raise (Failure "malformed parse tree in ast_ize_expr")
 
 and ast_ize_reln_tail (lhs:ast_e) (tail:parse_tree) : ast_e =
   (* lhs in an inheritec attribute.
      tail is an ET parse tree node *)
   match tail with
-  (*
-     your code here ...
-  *)
+  | PT_nt ("ET", []) -> lhs
+  | PT_nt ("ET", [PT_term "=="; expr]) -> AST_binop ("==", lhs, (ast_ize_expr expr))
+  | PT_nt ("ET", [PT_term "<>"; expr]) -> AST_binop ("<>", lhs, (ast_ize_expr expr))
+  | PT_nt ("ET", [PT_term "<"; expr]) -> AST_binop ("<", lhs, (ast_ize_expr expr))
+  | PT_nt ("ET", [PT_term ">"; expr]) -> AST_binop (">", lhs, (ast_ize_expr expr))
+  | PT_nt ("ET", [PT_term "<="; expr]) -> AST_binop ("<=", lhs, (ast_ize_expr expr))
+  | PT_nt ("ET", [PT_term ">="; expr]) -> AST_binop (">=", lhs, (ast_ize_expr expr))
   | _ -> raise (Failure "malformed parse tree in ast_ize_reln_tail")
 
 and ast_ize_expr_tail (lhs:ast_e) (tail:parse_tree) : ast_e =
@@ -599,6 +603,10 @@ and ast_ize_expr_tail (lhs:ast_e) (tail:parse_tree) : ast_e =
   | _ -> raise (Failure "malformed parse tree in ast_ize_expr_tail")
 ;;
 
+(* Nate:
+  I made these just to run simple tests.
+  We can test by doing ast_ize_P l;; or ast_ize_P m;; in the interpreter 
+*)
 let l = parse ecg_parse_table "x := (1 * 4)";;
 let m = parse ecg_parse_table "read a";;
 
