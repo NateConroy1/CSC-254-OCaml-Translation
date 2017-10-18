@@ -585,7 +585,7 @@ and ast_ize_reln_tail (lhs:ast_e) (tail:parse_tree) : ast_e =
      tail is an ET parse tree node *)
   match tail with
   | PT_nt ("ET", []) -> lhs
-  | PT_nt ("ET", [ro; expr]) -> AST_binop (operator ro, lhs, (ast_ize_expr expr))
+  | PT_nt ("ET", [ro; expr]) -> AST_binop (ast_ize_op ro, lhs, (ast_ize_expr expr))
   | _ -> raise (Failure "malformed parse tree in ast_ize_reln_tail")
 
 and ast_ize_expr_tail (lhs:ast_e) (tail:parse_tree) : ast_e =
@@ -597,7 +597,9 @@ and ast_ize_expr_tail (lhs:ast_e) (tail:parse_tree) : ast_e =
   *)
   | _ -> raise (Failure "malformed parse tree in ast_ize_expr_tail")
 
-and operator (term:parse_tree) =
+and ast_ize_op (term:parse_tree) =
+  (* term is an ro, ao, or mo parse tree node,
+     it returns the string representation of the operator *)
   match term with
   | PT_nt ("ro", [PT_term "=="]) -> "=="
   | PT_nt ("ro", [PT_term "<>"]) -> "<>"
@@ -605,7 +607,7 @@ and operator (term:parse_tree) =
   | PT_nt ("ro", [PT_term ">"]) -> ">"
   | PT_nt ("ro", [PT_term "<="]) -> "<="
   | PT_nt ("ro", [PT_term ">="]) -> ">="
-  | _ -> ""
+  | _ -> raise (Failure "malformed parse tree in ast_ize_op")
 ;;
 
 let l = parse ecg_parse_table "x := (1 * 4)";;
