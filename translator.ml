@@ -585,12 +585,7 @@ and ast_ize_reln_tail (lhs:ast_e) (tail:parse_tree) : ast_e =
      tail is an ET parse tree node *)
   match tail with
   | PT_nt ("ET", []) -> lhs
-  | PT_nt ("ET", [PT_term "=="; expr]) -> AST_binop ("==", lhs, (ast_ize_expr expr))
-  | PT_nt ("ET", [PT_term "<>"; expr]) -> AST_binop ("<>", lhs, (ast_ize_expr expr))
-  | PT_nt ("ET", [PT_term "<"; expr]) -> AST_binop ("<", lhs, (ast_ize_expr expr))
-  | PT_nt ("ET", [PT_term ">"; expr]) -> AST_binop (">", lhs, (ast_ize_expr expr))
-  | PT_nt ("ET", [PT_term "<="; expr]) -> AST_binop ("<=", lhs, (ast_ize_expr expr))
-  | PT_nt ("ET", [PT_term ">="; expr]) -> AST_binop (">=", lhs, (ast_ize_expr expr))
+  | PT_nt ("ET", [ro; expr]) -> AST_binop (operator ro, lhs, (ast_ize_expr expr))
   | _ -> raise (Failure "malformed parse tree in ast_ize_reln_tail")
 
 and ast_ize_expr_tail (lhs:ast_e) (tail:parse_tree) : ast_e =
@@ -598,17 +593,23 @@ and ast_ize_expr_tail (lhs:ast_e) (tail:parse_tree) : ast_e =
      tail is a TT or FT parse tree node *)
   match tail with
   (*
-     your code here ...
+    your code here...
   *)
   | _ -> raise (Failure "malformed parse tree in ast_ize_expr_tail")
+
+and operator (term:parse_tree) =
+  match term with
+  | PT_nt ("ro", [PT_term "=="]) -> "=="
+  | PT_nt ("ro", [PT_term "<>"]) -> "<>"
+  | PT_nt ("ro", [PT_term "<"]) -> "<"
+  | PT_nt ("ro", [PT_term ">"]) -> ">"
+  | PT_nt ("ro", [PT_term "<="]) -> "<="
+  | PT_nt ("ro", [PT_term ">="]) -> ">="
+  | _ -> ""
 ;;
 
-(* Nate:
-  I made these just to run simple tests.
-  We can test by doing ast_ize_P l;; or ast_ize_P m;; in the interpreter 
-*)
 let l = parse ecg_parse_table "x := (1 * 4)";;
-let m = parse ecg_parse_table "read a";;
+let m = parse ecg_parse_table "read a if a == 3 write a write 3 fi";;
 
 (*******************************************************************
     Translate to C
