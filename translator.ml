@@ -637,7 +637,7 @@ let p = ast_ize_P (parse ecg_parse_table "a := 3 * (6 + 2) write a")
 let rec translate (ast:ast_sl) : string * string =
   "", String.concat "" ["#include <stdio.h>\n";
                          "#include <stdlib.h>\n\n";
-                         "int getint() { int a; scanf(\"%d\", &a); return a; }\n";
+                         "int getint() { int a; if(scanf(\"%d\", &a) == 0) { printf(\"Error: cannot enter non-numeric input.\\n\"); exit(1); } return a; }\n";
                          "void putint(int a) { printf(\"%d\\n\", a); }\n";
                          "int divide(int x, int y) { if(y == 0) { printf(\"Error: cannot divide by 0.\\n\"); exit(1); } return x / y; }\n\n";
                          "int main() {\n";
@@ -694,5 +694,5 @@ and translate_do (statement_list:ast_sl) : string =
 and translate_check (expr:ast_e) : string =
   String.concat "" ["if (!("; translate_expr expr; ")) break;\n"];;
 
-print_string(fst (translate p));;
-print_string (snd (translate p));;
+print_string(fst (translate o));;
+print_string (snd (translate o));;
