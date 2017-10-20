@@ -632,7 +632,13 @@ let n = ast_ize_P (parse ecg_parse_table "a := 0 do check a < 3 write a a := a +
 
 (* warnings  output_program *) 
 let rec translate (ast:ast_sl) : string * string =
-  "", String.concat " " ["#include <stdio.h>"; "#include <stdlib.h>"; translate_sl ast]
+  "", String.concat "" ["#include <stdio.h>\n";
+                         "#include <stdlib.h>\n";
+                         "int getint() { int a; scanf(\"%d\", &a); return a; }\n";
+                         "void putint(int a) { printf(\"%d\\n\", a); }\n";
+                         "int main() {\n";
+                         translate_sl ast;
+                         "}\n"]
 
 and translate_sl (ast:ast_sl) : string =
   match ast with
@@ -665,19 +671,22 @@ and translate_expr (ast:ast_e) : string =
       -> id
 
 and translate_assign (id:string) (expr:ast_e) : string =
-  String.concat "" ["int "; id; " = "; translate_expr expr; "; "]
+  String.concat "" [id; " = "; translate_expr expr; ";\n"]
 
 and translate_read (id:string) : string =
-  String.concat "" ["int "; id; " = "; "getint(); "]
+  String.concat "" ["int "; id; " = "; "getint();\n"]
 
 and translate_write (expr:ast_e) : string =
-  String.concat "" ["putint ("; translate_expr expr; "); "]
+  String.concat "" ["putint ("; translate_expr expr; ");\n"]
 
 and translate_if (expr:ast_e) (statement_list:ast_sl) : string =
-  String.concat "" ["if ("; translate_expr expr; ") { "; translate_sl statement_list; "} "]
+  String.concat "" ["if ("; translate_expr expr; ") {\n"; translate_sl statement_list; "}\n"]
 
 and translate_do (statement_list:ast_sl) : string = 
-  String.concat "" ["while (true) { "; translate_sl statement_list; "} "]
+  String.concat "" ["while (1) {\n"; translate_sl statement_list; "}\n"]
 
 and translate_check (expr:ast_e) : string =
-  String.concat "" ["if (!"; translate_expr expr; ") break; "]
+  String.concat "" ["if (!("; translate_expr expr; ")) break;\n"];;
+
+print_string(fst (translate n));;
+print_string (snd (translate n));;
