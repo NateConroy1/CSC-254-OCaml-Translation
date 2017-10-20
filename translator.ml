@@ -615,8 +615,9 @@ and ast_ize_op (term:parse_tree) =
   | _ -> raise (Failure "malformed parse tree in ast_ize_op")
 ;;
 
-let l = parse ecg_parse_table "x := (1 * 4)";;
-let m = parse ecg_parse_table "read a if a == 3 write a write 3 fi";;
+let l = ast_ize_P (parse ecg_parse_table "x := (1 * 4)");;
+let m = ast_ize_P (parse ecg_parse_table "read a if a == 3 write a write 3 fi");;
+let n = ast_ize_P (parse ecg_parse_table "a := 0 do check a < 3 write a a := a + 1 od")
 
 (*******************************************************************
     Translate to C
@@ -629,28 +630,54 @@ let m = parse ecg_parse_table "read a if a == 3 write a write 3 fi";;
    indicating their names and the lines on which the writes occur.  Your
    C program should contain code to check for dynamic semantic errors. *)
 
-(*  commented out so this code will complile
+(* warnings  output_program *) 
+let rec translate (ast:ast_sl) : string * string =
+  "", String.concat " " ["#include <stdio.h>"; "#include <stdlib.h>"; translate_sl ast]
 
-let rec translate (ast:ast_sl)
-    :  string *  string
-    (* warnings  output_program *) = ...
+and translate_sl (ast:ast_sl) : string =
+  match ast with
+  | h::t -> String.concat "" [translate_s h; translate_sl t]
+  | [] -> ""
 
-and translate_sl (...
+and translate_s (ast:ast_s) : string = 
+  match ast with 
+  | AST_assign (id, expr)
+      -> translate_assign id expr
+  | AST_read (id)
+      -> translate_read id
+  | AST_write (expr)
+      -> translate_write expr 
+  | AST_if (expr, statement_list)
+      -> translate_if expr statement_list
+  | AST_do (statement_list)
+      -> translate_do statement_list
+  | AST_check (expr)
+      -> translate_check expr
+  | _ -> "translate_s error"
 
-and translate_s (...
+and translate_expr (ast:ast_e) : string =
+  match ast with
+  | AST_binop (operator, left_expr, right_expr)
+      -> String.concat " " [translate_expr left_expr; operator; translate_expr right_expr]
+  | AST_num (num)
+      -> num
+  | AST_id (id) 
+      -> id
 
-and translate_assign (...
+and translate_assign (id:string) (expr:ast_e) : string =
+  String.concat "" ["int "; id; " = "; translate_expr expr; "; "]
 
-and translate_read (...
+and translate_read (id:string) : string =
+  String.concat "" ["int "; id; " = "; "getint(); "]
 
-and translate_write (...
+and translate_write (expr:ast_e) : string =
+  String.concat "" ["putint ("; translate_expr expr; "); "]
 
-and translate_if (...
+and translate_if (expr:ast_e) (statement_list:ast_sl) : string =
+  String.concat "" ["if ("; translate_expr expr; ") { "; translate_sl statement_list; "} "]
 
-and translate_do (...
+and translate_do (statement_list:ast_sl) : string = 
+  String.concat "" ["while (true) { "; translate_sl statement_list; "} "]
 
-and translate_check (...
-
-and translate_expr (...
-
-*)
+and translate_check (expr:ast_e) : string =
+  String.concat "" ["if (!"; translate_expr expr; ") break; "]
