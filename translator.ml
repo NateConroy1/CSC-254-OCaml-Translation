@@ -618,6 +618,9 @@ and ast_ize_op (term:parse_tree) =
 let l = ast_ize_P (parse ecg_parse_table "x := (1 * 4)");;
 let m = ast_ize_P (parse ecg_parse_table "read a if a == 3 write a write 3 fi");;
 let n = ast_ize_P (parse ecg_parse_table "a := 0 do check a < 3 write a a := a + 1 od")
+(* divide by 0 when a = 1 *)
+let o = ast_ize_P (parse ecg_parse_table "read a b := 3 c := b / (a - 1) write c")
+let p = ast_ize_P (parse ecg_parse_table "a := 3 * (6 + 2) write a")
 
 (*******************************************************************
     Translate to C
@@ -633,9 +636,10 @@ let n = ast_ize_P (parse ecg_parse_table "a := 0 do check a < 3 write a a := a +
 (* warnings  output_program *) 
 let rec translate (ast:ast_sl) : string * string =
   "", String.concat "" ["#include <stdio.h>\n";
-                         "#include <stdlib.h>\n";
+                         "#include <stdlib.h>\n\n";
                          "int getint() { int a; scanf(\"%d\", &a); return a; }\n";
                          "void putint(int a) { printf(\"%d\\n\", a); }\n";
+                         "int divide(int x, int y) { if(y == 0) { printf(\"Error: cannot divide by 0.\\n\"); exit(1); } return x / y; }\n\n";
                          "int main() {\n";
                          translate_sl ast;
                          "}\n"]
@@ -663,8 +667,10 @@ and translate_s (ast:ast_s) : string =
 
 and translate_expr (ast:ast_e) : string =
   match ast with
+  | AST_binop ("/", left_expr, right_expr)
+      -> String.concat "" ["divide(";translate_expr left_expr; ", "; translate_expr right_expr; ")"]
   | AST_binop (operator, left_expr, right_expr)
-      -> String.concat " " [translate_expr left_expr; operator; translate_expr right_expr]
+      -> String.concat "" ["("; translate_expr left_expr; " "; operator; " "; translate_expr right_expr; ")"]
   | AST_num (num)
       -> num
   | AST_id (id) 
@@ -688,5 +694,5 @@ and translate_do (statement_list:ast_sl) : string =
 and translate_check (expr:ast_e) : string =
   String.concat "" ["if (!("; translate_expr expr; ")) break;\n"];;
 
-print_string(fst (translate n));;
-print_string (snd (translate n));;
+print_string(fst (translate p));;
+print_string (snd (translate p));;
