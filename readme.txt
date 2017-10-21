@@ -57,7 +57,30 @@ or the person who has to understand the insides of your code, you may need to de
 		SAMPLE OUTPUT
 --------------------------------
 
+# translate test4;;
 
+stdout:
 
+//C CODE:
 
+#include <stdio.h>
+#include <stdlib.h>
 
+int getint() { int a; char ch; if(scanf("%d", &a) == 0) { printf("Error: cannot enter non-numeric input.\n"); exit(1); } else if(scanf("%c", &ch) == EOF) { printf("Error: unexpected end of input.\n"); exit(1); } return a; }
+void putint(int a) { printf("%d\n", a); }
+int divide(int x, int y) { if(y == 0) { printf("Error: cannot divide by 0.\n"); exit(1); } return x / y; }
+
+int main() {
+int a = getint();
+int b = 3;
+int c = divide(3, (a - 1));
+a = c;
+c = 1;
+int d = (c + 3);
+putint (c);
+}
+
+returned by translate function:
+- : string * string =
+("b d ",
+ "//C CODE:\n\n#include <stdio.h>\n#include <stdlib.h>\n\nint getint() { int a; char ch; if(scanf(\"%d\", &a) == 0) { printf(\"Error: cannot enter non-numeric input.\\n\"); exit(1); } else if(scanf(\"%c\", &ch) == EOF) { printf(\"Error: unexpected end of input.\\n\"); exit(1); } return a; }\nvoid putint(int a) { printf(\"%d\\n\", a); }\nint divide(int x, int y) { if(y == 0) { printf(\"Error: cannot divide by 0.\\n\"); exit(1); } return x / y; }\n\nint main() {\nint a = getint();\nint b = 3;\nint c = divide(3, (a - 1));\na = c;\nc = 1;\nint d = (c + 3);\nputint (c);\n}\n")
