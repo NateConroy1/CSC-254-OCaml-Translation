@@ -615,13 +615,6 @@ and ast_ize_op (term:parse_tree) =
   | _ -> raise (Failure "malformed parse tree in ast_ize_op")
 ;;
 
-let l = ast_ize_P (parse ecg_parse_table "x := (1 * 4)");;
-let m = ast_ize_P (parse ecg_parse_table "read a if a == 3 write a write 3 fi");;
-let n = ast_ize_P (parse ecg_parse_table "a := 0 do check a < 3 write a a := a + 1 od")
-(* divide by 0 when a = 1 *)
-let o = ast_ize_P (parse ecg_parse_table "read a b := 3 c := 3 / (a - 1) a := c c := 1 d := c + 3 write c")
-let p = ast_ize_P (parse ecg_parse_table "a := 3 * (6 + 2) write a")
-
 (*******************************************************************
     Translate to C
  *******************************************************************)
@@ -636,19 +629,26 @@ let p = ast_ize_P (parse ecg_parse_table "a := 3 * (6 + 2) write a")
 type ast_varlist = ast_var list
 and ast_var = AST_var of (string * int);;
 
+(* function that returns the variable id string from an ast_var *)
 let extract_varstring (v:ast_var) : string =
   match v with
   | AST_var(var_string, var_int) -> var_string;;
 
+(* function that returns the variable initialize bit from an ast_var
+   if the value is 0, the variable has not yet been initialized
+   if the value is 1, the value has been initialized
+*)
 let extract_varint (v:ast_var) : int =
   match v with
   | AST_var(var_string, var_int) -> var_int;;
 
+(* function that returns true or false depending on whether the variable is in the list *)
 let rec var_exists (vl:ast_varlist) (var:string) =
   match vl with 
   | h::t -> if (String.equal (var) (extract_varstring h)) then true else var_exists (t) (var)
   | [] -> false;;
 
+(* function that replaces a variable in the list with a new element *)
 let rec replace_var (old_vl:ast_varlist) (new_vl:ast_varlist) (var:ast_var) =
   match old_vl with
   | h::t -> if (String.equal (extract_varstring h) (extract_varstring var))
@@ -656,6 +656,7 @@ let rec replace_var (old_vl:ast_varlist) (new_vl:ast_varlist) (var:ast_var) =
             else replace_var (t) (List.append (new_vl) ([h])) (var)
   | [] -> new_vl;;
 
+(* function that returns a string representing the unused variables in the variable list *)
 let rec get_unused_vars (vl:ast_varlist) (str:string) : string =
   match vl with
   | h::t -> if ((extract_varint h) = 0)
@@ -668,7 +669,6 @@ let rec translate (ast:ast_sl) : string * string =
   let (str, vl) = translate_sl ast [] in
   let str = (String.concat "" ["//C CODE:\n\n#include <stdio.h>\n";
                          "#include <stdlib.h>\n\n";
-                         (* "int getint() { int a; char ch; if(scanf(\"%d\", &a) == 0) { printf(\"Error: cannot enter non-numeric input.\\n\"); exit(1); } else if(scanf(\"%c\", &ch) == EOF) { printf(\"Error: cannot enter non-numeric input.\\n\"); exit(1); } return a; }\n"; *)
                          "int getint() { int a; char ch; if(scanf(\"%d\", &a) == 0) { printf(\"Error: cannot enter non-numeric input.\\n\"); exit(1); } else if(scanf(\"%c\", &ch) == EOF) { printf(\"Error: unexpected end of input.\\n\"); exit(1); } return a; }\n";
                          "void putint(int a) { printf(\"%d\\n\", a); }\n";
                          "int divide(int x, int y) { if(y == 0) { printf(\"Error: cannot divide by 0.\\n\"); exit(1); } return x / y; }\n\n";
@@ -713,10 +713,8 @@ and translate_expr (ast:ast_e) (vl:ast_varlist) : string * ast_varlist =
       String.concat "" ["("; str1; " "; operator; " "; str2; ")"], new_vl
   | AST_num (num)
       -> num, vl
-  | AST_id (id) ->
-      let new_vl = (replace_var (vl) ([]) (AST_var(id, 1))) in
-      Printf.printf "%s_%d\n" (get_unused_vars new_vl "") (List.length new_vl);
-      id, new_vl
+  | AST_id (id)
+      -> id, (replace_var (vl) ([]) (AST_var(id, 1)))
 
 and translate_assign (id:string) (expr:ast_e) (vl:ast_varlist) : string * ast_varlist =
   if var_exists (vl) (id)
@@ -745,4 +743,10 @@ and translate_check (expr:ast_e) (vl:ast_varlist) : string * ast_varlist =
   let (str, new_vl) = translate_expr expr vl in
   String.concat "" ["if (!("; str; ")) break;\n"], new_vl;;
 
-print_string (snd (translate o));;
+(* SAMPLE TEST CASES *)
+(* to run: 'translate test1;;' *)
+let test1 = ast_ize_P (parse ecg_parse_table "x := (1 * 4)");;
+let test2 = ast_ize_P (parse ecg_parse_table "read a if a == 3 write a write 3 fi");;
+let test3 = ast_ize_P (parse ecg_parse_table "a := 0 do check a < 3 write a a := a + 1 od")
+let test4 = ast_ize_P (parse ecg_parse_table "read a b := 3 c := 3 / (a - 1) a := c c := 1 d := c + 3 write c")
+let test5 = ast_ize_P (parse ecg_parse_table "a := 3 * (6 + 2) b := a - 1 write a")
