@@ -27,7 +27,12 @@ nconroy1@u.rochester.edu
 
 1. run "ocaml" in terminal to enter OCaml interpretor 
 2. run "#use [full path of translator.ml file] ;;" 
-3. run "translate test1", "translate test2", "translate test3", "translate test4", or "translate test5" + ";;"
+3. run one of the test cases:
+	"translate test1;;"
+	"translate test2;;"
+	"translate test3;;"
+	"translate test4;;"
+	"translate test5;;"
 4. the C code will print to stdout, copy it, paste it in a new C file, compile and run
 5. the translate function returns 2 strings, the unused variables, and the C code
 
