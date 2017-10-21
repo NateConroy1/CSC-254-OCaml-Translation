@@ -657,7 +657,8 @@ let rec translate (ast:ast_sl) : ast_varlist * string =
   let (str, vl) = translate_sl ast [] in
   vl, String.concat "" ["#include <stdio.h>\n";
                          "#include <stdlib.h>\n\n";
-                         "int getint() { int a; if(scanf(\"%d\", &a) == 0) { printf(\"Error: cannot enter non-numeric input.\\n\"); exit(1); } return a; }\n";
+                         (* "int getint() { int a; char ch; if(scanf(\"%d\", &a) == 0) { printf(\"Error: cannot enter non-numeric input.\\n\"); exit(1); } else if(scanf(\"%c\", &ch) == EOF) { printf(\"Error: cannot enter non-numeric input.\\n\"); exit(1); } return a; }\n"; *)
+                         "int getint() { int a; char ch; if(scanf(\"%d\", &a) == 0) { printf(\"Error: cannot enter non-numeric input.\\n\"); exit(1); } else if(scanf(\"%c\", &ch) == EOF) { printf(\"Error: unexpected end of input.\\n\"); exit(1); } return a; }\n";
                          "void putint(int a) { printf(\"%d\\n\", a); }\n";
                          "int divide(int x, int y) { if(y == 0) { printf(\"Error: cannot divide by 0.\\n\"); exit(1); } return x / y; }\n\n";
                          "int main() {\n";
