@@ -619,7 +619,7 @@ let l = ast_ize_P (parse ecg_parse_table "x := (1 * 4)");;
 let m = ast_ize_P (parse ecg_parse_table "read a if a == 3 write a write 3 fi");;
 let n = ast_ize_P (parse ecg_parse_table "a := 0 do check a < 3 write a a := a + 1 od")
 (* divide by 0 when a = 1 *)
-let o = ast_ize_P (parse ecg_parse_table "read a b := 3 c := b / (a - 1) write c")
+let o = ast_ize_P (parse ecg_parse_table "read a b := 3 c := b / (a - 1) a := b c := 1 b := c + 3 write c")
 let p = ast_ize_P (parse ecg_parse_table "a := 3 * (6 + 2) write a")
 
 (*******************************************************************
@@ -633,66 +633,98 @@ let p = ast_ize_P (parse ecg_parse_table "a := 3 * (6 + 2) write a")
    indicating their names and the lines on which the writes occur.  Your
    C program should contain code to check for dynamic semantic errors. *)
 
+type ast_varlist = ast_var list
+and ast_var = AST_var of (string * int);;
+
+let extract_varstring (v:ast_var) : string =
+  match v with
+  | AST_var(var_string, var_int) -> var_string;;
+
+let rec var_exists (vl:ast_varlist) (var:string) =
+  match vl with 
+  | h::t -> if (String.equal (var) (extract_varstring h)) then true else var_exists (t) (var)
+  | [] -> false;;
+
+let rec replace_var (old_vl:ast_varlist) (new_vl:ast_varlist) (var:ast_var) =
+  match old_vl with
+  | h::t -> if (String.equal (extract_varstring h) (extract_varstring var))
+            then replace_var (t) (List.append (new_vl) ([AST_var((extract_varstring var), 1)])) (var)
+            else replace_var (t) (List.append (new_vl) ([h])) (var)
+  | [] -> new_vl;;
+
 (* warnings  output_program *) 
-let rec translate (ast:ast_sl) : string * string =
-  "", String.concat "" ["#include <stdio.h>\n";
+let rec translate (ast:ast_sl) : ast_varlist * string =
+  let (str, vl) = translate_sl ast [] in
+  vl, String.concat "" ["#include <stdio.h>\n";
                          "#include <stdlib.h>\n\n";
                          "int getint() { int a; if(scanf(\"%d\", &a) == 0) { printf(\"Error: cannot enter non-numeric input.\\n\"); exit(1); } return a; }\n";
                          "void putint(int a) { printf(\"%d\\n\", a); }\n";
                          "int divide(int x, int y) { if(y == 0) { printf(\"Error: cannot divide by 0.\\n\"); exit(1); } return x / y; }\n\n";
                          "int main() {\n";
-                         translate_sl ast;
+                         str;
                          "}\n"]
 
-and translate_sl (ast:ast_sl) : string =
+and translate_sl (ast:ast_sl) (vl:ast_varlist) : string * ast_varlist =
   match ast with
-  | h::t -> String.concat "" [translate_s h; translate_sl t]
-  | [] -> ""
+  | h::t -> let (str1, new_vl) = translate_s h vl in
+            let (str2, new_vl) = translate_sl t new_vl in
+            String.concat "" [str1; str2], new_vl
+  | [] -> "", vl
 
-and translate_s (ast:ast_s) : string = 
+and translate_s (ast:ast_s) (vl:ast_varlist) : string * ast_varlist = 
   match ast with 
   | AST_assign (id, expr)
-      -> translate_assign id expr
+      -> translate_assign id expr vl
   | AST_read (id)
-      -> translate_read id
+      -> translate_read id vl
   | AST_write (expr)
-      -> translate_write expr 
+      -> translate_write expr vl
   | AST_if (expr, statement_list)
-      -> translate_if expr statement_list
+      -> translate_if expr statement_list vl
   | AST_do (statement_list)
-      -> translate_do statement_list
+      -> translate_do statement_list vl
   | AST_check (expr)
-      -> translate_check expr
-  | _ -> "translate_s error"
+      -> translate_check expr vl
+  | _ -> "translate_s error", vl
 
-and translate_expr (ast:ast_e) : string =
+and translate_expr (ast:ast_e) (vl:ast_varlist) : string * ast_varlist =
   match ast with
   | AST_binop ("/", left_expr, right_expr)
-      -> String.concat "" ["divide(";translate_expr left_expr; ", "; translate_expr right_expr; ")"]
+      -> let (str1, new_vl) = translate_expr left_expr vl in
+         let (str2, new_vl) = translate_expr right_expr new_vl in
+      String.concat "" ["divide("; str1; ", "; str2; ")"], new_vl
   | AST_binop (operator, left_expr, right_expr)
-      -> String.concat "" ["("; translate_expr left_expr; " "; operator; " "; translate_expr right_expr; ")"]
+      -> let (str1, new_vl) = translate_expr left_expr vl in
+         let (str2, new_vl) = translate_expr right_expr new_vl in
+      String.concat "" ["("; str1; " "; operator; " "; str2; ")"], new_vl
   | AST_num (num)
-      -> num
-  | AST_id (id) 
-      -> id
+      -> num, vl
+  | AST_id (id)
+      -> id, (replace_var (vl) ([]) (AST_var(id, 1)))
 
-and translate_assign (id:string) (expr:ast_e) : string =
-  String.concat "" [id; " = "; translate_expr expr; ";\n"]
+and translate_assign (id:string) (expr:ast_e) (vl:ast_varlist) : string * ast_varlist =
+  if var_exists (vl) (id)
+  then String.concat "" [id; " = "; fst (translate_expr expr vl); ";\n"], vl
+  else String.concat "" ["int "; id; " = "; fst (translate_expr expr vl); ";\n"], (List.append (vl) ([AST_var(id, 0)]))
 
-and translate_read (id:string) : string =
-  String.concat "" ["int "; id; " = "; "getint();\n"]
+and translate_read (id:string) (vl:ast_varlist) : string * ast_varlist =
+  String.concat "" ["int "; id; " = "; "getint();\n"], (List.append (vl) ([AST_var(id, 0)]))
 
-and translate_write (expr:ast_e) : string =
-  String.concat "" ["putint ("; translate_expr expr; ");\n"]
+and translate_write (expr:ast_e) (vl:ast_varlist) : string * ast_varlist =
+  let (str, new_vl) = translate_expr expr vl in
+  String.concat "" ["putint ("; str; ");\n"], new_vl
 
-and translate_if (expr:ast_e) (statement_list:ast_sl) : string =
-  String.concat "" ["if ("; translate_expr expr; ") {\n"; translate_sl statement_list; "}\n"]
+and translate_if (expr:ast_e) (statement_list:ast_sl) (vl:ast_varlist) : string * ast_varlist =
+  let (str1, new_vl) = translate_expr expr vl in
+  let (str2, new_vl) = translate_sl statement_list new_vl in
+  String.concat "" ["if ("; str1; ") {\n"; str2; "}\n"], new_vl
 
-and translate_do (statement_list:ast_sl) : string = 
-  String.concat "" ["while (1) {\n"; translate_sl statement_list; "}\n"]
+and translate_do (statement_list:ast_sl) (vl:ast_varlist) : string * ast_varlist = 
+  let (str, new_vl) = translate_sl statement_list vl in
+  String.concat "" ["while (1) {\n"; str; "}\n"], new_vl
 
-and translate_check (expr:ast_e) : string =
-  String.concat "" ["if (!("; translate_expr expr; ")) break;\n"];;
+and translate_check (expr:ast_e) (vl:ast_varlist) : string * ast_varlist =
+  let (str, new_vl) = translate_expr expr vl in
+  String.concat "" ["if (!("; str; ")) break;\n"], new_vl;;
 
-print_string(fst (translate o));;
 print_string (snd (translate o));;
