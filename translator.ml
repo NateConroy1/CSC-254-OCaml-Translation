@@ -619,7 +619,7 @@ let l = ast_ize_P (parse ecg_parse_table "x := (1 * 4)");;
 let m = ast_ize_P (parse ecg_parse_table "read a if a == 3 write a write 3 fi");;
 let n = ast_ize_P (parse ecg_parse_table "a := 0 do check a < 3 write a a := a + 1 od")
 (* divide by 0 when a = 1 *)
-let o = ast_ize_P (parse ecg_parse_table "read a b := 3 c := b / (a - 1) a := b c := 1 b := c + 3 write c")
+let o = ast_ize_P (parse ecg_parse_table "read a b := 3 c := 3 / (a - 1) a := c c := 1 d := c + 3 write c")
 let p = ast_ize_P (parse ecg_parse_table "a := 3 * (6 + 2) write a")
 
 (*******************************************************************
@@ -640,6 +640,10 @@ let extract_varstring (v:ast_var) : string =
   match v with
   | AST_var(var_string, var_int) -> var_string;;
 
+let extract_varint (v:ast_var) : int =
+  match v with
+  | AST_var(var_string, var_int) -> var_int;;
+
 let rec var_exists (vl:ast_varlist) (var:string) =
   match vl with 
   | h::t -> if (String.equal (var) (extract_varstring h)) then true else var_exists (t) (var)
@@ -652,17 +656,26 @@ let rec replace_var (old_vl:ast_varlist) (new_vl:ast_varlist) (var:ast_var) =
             else replace_var (t) (List.append (new_vl) ([h])) (var)
   | [] -> new_vl;;
 
+let rec get_unused_vars (vl:ast_varlist) (str:string) : string =
+  match vl with
+  | h::t -> if ((extract_varint h) = 0)
+            then ((get_unused_vars (t)) (String.concat "" [str; extract_varstring h; " "]))
+            else ((get_unused_vars (t)) (str))
+  | [] -> str;;
+
 (* warnings  output_program *) 
-let rec translate (ast:ast_sl) : ast_varlist * string =
+let rec translate (ast:ast_sl) : string * string =
   let (str, vl) = translate_sl ast [] in
-  vl, String.concat "" ["#include <stdio.h>\n";
+  let str = (String.concat "" ["//C CODE:\n\n#include <stdio.h>\n";
                          "#include <stdlib.h>\n\n";
                          "int getint() { int a; if(scanf(\"%d\", &a) == 0) { printf(\"Error: cannot enter non-numeric input.\\n\"); exit(1); } return a; }\n";
                          "void putint(int a) { printf(\"%d\\n\", a); }\n";
                          "int divide(int x, int y) { if(y == 0) { printf(\"Error: cannot divide by 0.\\n\"); exit(1); } return x / y; }\n\n";
                          "int main() {\n";
                          str;
-                         "}\n"]
+                         "}\n"]) in
+  print_string str;
+  get_unused_vars (vl) (""), str
 
 and translate_sl (ast:ast_sl) (vl:ast_varlist) : string * ast_varlist =
   match ast with
@@ -699,13 +712,17 @@ and translate_expr (ast:ast_e) (vl:ast_varlist) : string * ast_varlist =
       String.concat "" ["("; str1; " "; operator; " "; str2; ")"], new_vl
   | AST_num (num)
       -> num, vl
-  | AST_id (id)
-      -> id, (replace_var (vl) ([]) (AST_var(id, 1)))
+  | AST_id (id) ->
+      let new_vl = (replace_var (vl) ([]) (AST_var(id, 1))) in
+      Printf.printf "%s_%d\n" (get_unused_vars new_vl "") (List.length new_vl);
+      id, new_vl
 
 and translate_assign (id:string) (expr:ast_e) (vl:ast_varlist) : string * ast_varlist =
   if var_exists (vl) (id)
-  then String.concat "" [id; " = "; fst (translate_expr expr vl); ";\n"], vl
-  else String.concat "" ["int "; id; " = "; fst (translate_expr expr vl); ";\n"], (List.append (vl) ([AST_var(id, 0)]))
+  then (let (str, new_vl) = translate_expr expr vl in
+        String.concat "" [id; " = "; str; ";\n"], new_vl)
+  else (let (str, new_vl) = translate_expr expr vl in
+        String.concat "" ["int "; id; " = "; str; ";\n"], (List.append (new_vl) ([AST_var(id, 0)])))
 
 and translate_read (id:string) (vl:ast_varlist) : string * ast_varlist =
   String.concat "" ["int "; id; " = "; "getint();\n"], (List.append (vl) ([AST_var(id, 0)]))
